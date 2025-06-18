@@ -43,7 +43,7 @@ resource "kubernetes_ingress_v1" "grav" {
           }
         }
         path {
-          path      = "/dw/[^/]+/v/[^/]+/o/[^/]+/uploads$"
+          path      = "/dw/[^/]+/v/[^/]+/(o/[^/]+/)?uploads$"
           path_type = "ImplementationSpecific"
           backend {
             service {
