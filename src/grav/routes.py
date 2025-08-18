@@ -64,6 +64,11 @@ def configure_routes(
             scan_forward_home_worker,
             methods=home_wk_methods,
         ),
+        Route(
+            "/o/{org}/api/s/{share}/attachments",
+            scan_forward_home_worker,
+            methods=home_wk_methods,
+        ),
     ]
 
     return routes
