@@ -2,6 +2,27 @@
 
 A proxy for Grist handling antivirus scans using [Je clique ou pas ?](https://jecliqueoupas.cyber.gouv.fr/accueil). Meant to be used on Kubernetes with nginx-ingress.
 
+## Local dev setup
+
+To test locally with the live API you can use the provided `docker-compose.yml`.
+
+```bash
+cp .env.sample .env
+# then adjust .env to your needs
+
+# build and start the service
+# along with a basic server that listens for forwarded requests
+docker compose up --build -d
+
+# create test file to upload
+dd if=/dev/random of=/tmp/random.1k bs=1024 count=1
+# post file with curl
+curl -X POST -F 'upload=@/tmp/random.1k' localhost:8080/dw/dw/v/v/uploads
+# check the logs for grav and for the forwarded service
+docker compose logs grav
+docker compose logs testforward
+```
+
 ## Testing integration locally
 
 Set up a minikube node with KVM and mount the project directory on the node.
