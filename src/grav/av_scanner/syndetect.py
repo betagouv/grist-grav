@@ -43,22 +43,20 @@ class SyndetectAVScanner(BaseAVScanner):
         digest = hashlib.file_digest(file, "sha256").hexdigest()
         logger.info(f"processing file with digest {digest}")
         scan_result = await self._check_sha256(digest)
+
         if scan_result == self._IntermediateResult.NOT_SCANNED:
             logger.debug(f"file {digest} is not scanned yet, submitting")
             await self._submit(file)
             logger.debug(f"file {digest} submitted")
-            retries = 0
-            while True:
-                await anyio.sleep(
-                    min(self._POLL_TIME_FACTOR**retries, self._MAX_POLL_TIME)
-                )
-                logger.debug(f"file {digest} checking results (retry {retries})")
-                scan_result = await self._check_sha256(digest)
-                if scan_result != self._IntermediateResult.SCANNING:
-                    break
-                retries += 1
-                if retries > self._RETRIES:
-                    break
+            # poll with faster retries at the start in case the file is scanned quickly
+            scan_result = await self._poll(digest)
+
+        elif scan_result == self._IntermediateResult.SCANNING:
+            logger.debug(f"file {digest} hasn't finished scanning yet, checking result")
+            # if the file is already being scanned, it's likely been for a long time.
+            # no need to poll fast at the start
+            scan_result = await self._poll(digest, max_duration=True)
+
         logger.info(f"file {digest} is {scan_result}")
         if scan_result == self._IntermediateResult.MALWARE:
             return AVScanResult.MALWARE
@@ -66,6 +64,26 @@ class SyndetectAVScanner(BaseAVScanner):
             return AVScanResult.SAFE
         else:
             return AVScanResult.FAIL
+
+    async def _poll(self, digest, max_duration=False):
+        retries = 0
+        while True:
+            if max_duration:
+                sleep_duration = self._MAX_POLL_TIME
+            else:
+                sleep_duration = min(
+                    self._POLL_TIME_FACTOR**retries,
+                    self._MAX_POLL_TIME,
+                )
+            await anyio.sleep(sleep_duration)
+            logger.debug(f"file {digest} checking results (retry {retries})")
+            scan_result = await self._check_sha256(digest)
+            if scan_result != self._IntermediateResult.SCANNING:
+                break
+            retries += 1
+            if retries > self._RETRIES:
+                break
+        return scan_result
 
     async def _submit(self, file):
         await self._CLIENT.post("/submit", files={"file": file})
