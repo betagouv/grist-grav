@@ -24,7 +24,7 @@ async def endpoint_scan(request, av_scanner: BaseAVScanner, forwarder: BaseForwa
             elif result == AVScanResult.MALWARE:
                 return JSONResponse({"error": "malware file"}, status_code=400)
             else:
-                return JSONResponse({"error": "failed AV test"}, status_code=502)
+                return JSONResponse({"error": "Échec de l'analyse antivirus"}, status_code=408)
     else:
         return await forwarder.forward(request)
 
