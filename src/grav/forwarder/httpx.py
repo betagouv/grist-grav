@@ -13,7 +13,9 @@ class HttpxForwarder(BaseForwarder):
     def __init__(self, new_origin: ParseResult) -> None:
         super().__init__()
         self._NEW_ORIGIN = new_origin
-        self._CLIENT = httpx.AsyncClient()
+        self._CLIENT = httpx.AsyncClient(
+            timeout=None,
+        )
 
     async def forward(
         self, request: Request, fileinfo: tuple[str, BinaryIO, str] = None

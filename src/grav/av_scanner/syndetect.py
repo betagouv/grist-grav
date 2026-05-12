@@ -28,6 +28,7 @@ class SyndetectAVScanner(BaseAVScanner):
         self._CLIENT = httpx.AsyncClient(
             base_url=self._API_URL,
             headers={"X-Auth-token": self._API_TOKEN},
+            timeout=None,
         )
 
         self._MAX_POLL_TIME = max_poll_time
