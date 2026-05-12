@@ -11,9 +11,6 @@ logger = logging.getLogger(__name__)
 
 async def endpoint_scan(request, av_scanner: BaseAVScanner, forwarder: BaseForwarder):
     if request.method == "POST":
-        # awaiting body() before form() ensures we can still read the body later on
-        # but maybe this has resource usage implications, we may need to manually save the body in a spooled temp file
-        await request.body()
         async with request.form() as form:
             upload = form.get("upload")
             if upload is None:
@@ -22,7 +19,7 @@ async def endpoint_scan(request, av_scanner: BaseAVScanner, forwarder: BaseForwa
             result = await av_scanner.process(upload.file)
             if result == AVScanResult.SAFE:
                 logger.info("scanner determined that the file is safe, forwarding")
-                return await forwarder.forward(request)
+                return await forwarder.forward(request, (upload.filename, upload.file, upload.content_type))
             elif result == AVScanResult.MALWARE:
                 logger.info("scanner determined that the file is malware, blocking")
                 return JSONResponse({"error": "malware file"}, status_code=400)

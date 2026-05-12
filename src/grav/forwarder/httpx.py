@@ -2,6 +2,7 @@ import logging
 from urllib.parse import urlparse, ParseResult
 
 import httpx
+from typing import BinaryIO
 
 from .base import BaseForwarder, Request, Response
 
@@ -14,7 +15,9 @@ class HttpxForwarder(BaseForwarder):
         self._NEW_ORIGIN = new_origin
         self._CLIENT = httpx.AsyncClient()
 
-    async def forward(self, request: Request) -> Response:
+    async def forward(
+        self, request: Request, fileinfo: tuple[str, BinaryIO, str] = None
+    ) -> Response:
         logger.info(f"forwarding request to {self._NEW_ORIGIN.geturl()}")
         old_url = urlparse(str(request.url))
         new_url = old_url._replace(
@@ -27,7 +30,7 @@ class HttpxForwarder(BaseForwarder):
             new_url.geturl(),
             headers=request.headers,
             params=request.query_params,
-            content=await request.body(),
+            files={"upload": fileinfo} if fileinfo else None,
         )
         logger.debug(f"request headers {request.headers}")
         logger.debug(f"forwarded headers {fwd_request.headers}")

@@ -6,5 +6,5 @@ from starlette.responses import Response
 
 class BaseForwarder(ABC):
     @abstractmethod
-    async def forward(self, request: Request) -> Response:
+    async def forward(self, request: Request, file = None) -> Response:
         pass
