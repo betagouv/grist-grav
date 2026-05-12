@@ -9,3 +9,7 @@ services:
     build:
       dockerfile: Dockerfile.testforward
       context: dev/
+  testsyndetect:
+    build:
+      dockerfile: Dockerfile.testsyndetect
+      context: dev/
