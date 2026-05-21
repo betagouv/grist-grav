@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 async def endpoint_scan(request, av_scanner: BaseAVScanner, forwarder: BaseForwarder):
     if request.method == "POST":
+        logger.info("received POST request, processing")
         async with request.form() as form:
             upload = form.get("upload")
             if upload is None:
@@ -27,6 +28,7 @@ async def endpoint_scan(request, av_scanner: BaseAVScanner, forwarder: BaseForwa
                 logger.info("failed to complete AV test")
                 return JSONResponse({"error": "failed AV test"}, status_code=502)
     else:
+        logger.info(f"received {request.method} request, forwarding as-is")
         return await forwarder.forward(request)
 
 
