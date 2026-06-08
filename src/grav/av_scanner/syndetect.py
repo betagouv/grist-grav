@@ -1,3 +1,4 @@
+import asyncio
 import enum
 import hashlib
 import logging
@@ -40,7 +41,21 @@ class SyndetectAVScanner(BaseAVScanner):
         SAFE = enum.auto()
         MALWARE = enum.auto()
 
-    async def process(self, file):
+    async def process(self, files):
+        logger.info(f"processing {len(files)} files")
+        tasks = list()
+        for file in files:
+            tasks.append(self._process_single(file))
+        results = await asyncio.gather(*tasks)
+        logger.info(f"got results for {len(files)} files")
+        for result in results:
+            if result == AVScanResult.MALWARE:
+                return AVScanResult.MALWARE
+            if result != AVScanResult.SAFE:
+                return AVScanResult.FAIL
+        return AVScanResult.SAFE
+
+    async def _process_single(self, file):
         digest = hashlib.file_digest(file, "sha256").hexdigest()
         logger.info(f"processing file with digest {digest}")
         scan_result = await self._check_sha256(digest)
@@ -96,12 +111,12 @@ class SyndetectAVScanner(BaseAVScanner):
             logger.debug(f"file sha {sha256} is not scanned yet")
             return self._IntermediateResult.NOT_SCANNED
         data = result.json()
-        if data.get("done") == True and data.get("is_malware") == False:
+        if data.get("done") and not data.get("is_malware"):
             logger.debug(f"file sha {sha256} is safe")
             return self._IntermediateResult.SAFE
-        elif data.get("done") == True and data.get("is_malware") == True:
+        elif data.get("done") and data.get("is_malware"):
             logger.debug(f"file sha {sha256} is malware")
             return self._IntermediateResult.MALWARE
-        elif not data.get("done") == True:
+        elif not data.get("done"):
             logger.debug(f"file sha {sha256} is still scanning")
             return self._IntermediateResult.SCANNING

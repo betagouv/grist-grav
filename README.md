@@ -14,10 +14,15 @@ cp .env.sample .env
 # along with a basic server that listens for forwarded requests
 docker compose up --build -d
 
-# create test file to upload
+# create test files to upload
 dd if=/dev/random of=/tmp/random.1k bs=1024 count=1
+# or
+echo -n toto > /tmp/toto
+echo -n tata > /tmp/tata
 # post file with curl
 curl -X POST -F 'upload=@/tmp/random.1k' localhost:8080/dw/dw/v/v/uploads
+# or
+curl -X POST -F 'upload=@/tmp/toto' -F 'upload=@/tmp/tata' localhost:8080/dw/dw/v/v/uploads
 # check the logs for grav and for the forwarded service
 docker compose logs grav
 docker compose logs testforward

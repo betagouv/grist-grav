@@ -4,7 +4,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from .av_scanner.base import AVScanResult, BaseAVScanner
-from .forwarder.base import BaseForwarder
+from .forwarder.base import BaseForwarder, FileInfo
 
 logger = logging.getLogger(__name__)
 
@@ -13,14 +13,18 @@ async def endpoint_scan(request, av_scanner: BaseAVScanner, forwarder: BaseForwa
     if request.method == "POST":
         logger.info("received POST request, processing")
         async with request.form() as form:
-            upload = form.get("upload")
-            if upload is None:
+            uploads = form.getlist("upload")
+            if not uploads:
                 logger.info("failed to extract upload from request")
                 return JSONResponse({"error": "failed upload"}, status_code=400)
-            result = await av_scanner.process(upload.file)
+            result = await av_scanner.process([upload.file for upload in uploads])
             if result == AVScanResult.SAFE:
                 logger.info("scanner determined that the file is safe, forwarding")
-                return await forwarder.forward(request, (upload.filename, upload.file, upload.content_type))
+                fileinfos = [
+                    FileInfo(upload.filename, upload.file, upload.content_type)
+                    for upload in uploads
+                ]
+                return await forwarder.forward(request, fileinfos)
             elif result == AVScanResult.MALWARE:
                 logger.info("scanner determined that the file is malware, blocking")
                 return JSONResponse({"error": "malware file"}, status_code=400)

@@ -1,10 +1,9 @@
 import logging
-from urllib.parse import urlparse, ParseResult
+from urllib.parse import ParseResult, urlparse
 
 import httpx
-from typing import BinaryIO
 
-from .base import BaseForwarder, Request, Response
+from .base import BaseForwarder, FileInfo, Request, Response
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +17,7 @@ class HttpxForwarder(BaseForwarder):
         )
 
     async def forward(
-        self, request: Request, fileinfo: tuple[str, BinaryIO, str] = None
+        self, request: Request, fileinfos: list[FileInfo] = None
     ) -> Response:
         logger.info(f"forwarding request to {self._NEW_ORIGIN.geturl()}")
         old_url = urlparse(str(request.url))
@@ -32,7 +31,7 @@ class HttpxForwarder(BaseForwarder):
             new_url.geturl(),
             headers=request.headers,
             params=request.query_params,
-            files={"upload": fileinfo} if fileinfo else None,
+            files = [("upload", (i.filename, i.file, i.content_type)) for i in fileinfos] if fileinfos else None,
         )
         logger.debug(f"request headers {request.headers}")
         logger.debug(f"forwarded headers {fwd_request.headers}")

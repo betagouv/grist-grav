@@ -1,5 +1,4 @@
 from starlette.applications import Starlette
-
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
@@ -10,7 +9,7 @@ async def results(request):
     print(f"got result request for {request.path_params['path']}")
     global iteration
     iteration += 1
-    if iteration % 2 == 1:
+    if iteration < 3:
         # return waiting
         return JSONResponse({}, status_code=404)
     else:
