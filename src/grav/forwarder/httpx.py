@@ -33,7 +33,7 @@ class HttpxForwarder(BaseForwarder):
             params=request.query_params,
             files = [("upload", (i.filename, i.file, i.content_type)) for i in fileinfos] if fileinfos else None,
         )
-        logger.debug(f"request headers {request.headers}")
+        logger.debug(f"request headers: {str.join("\n\t", [f"{header}={value}" for header, value in request.headers.items()])}")
         logger.debug(f"forwarded headers {fwd_request.headers}")
 
         response = await self._CLIENT.send(fwd_request)
