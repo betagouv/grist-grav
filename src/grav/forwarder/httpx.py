@@ -33,8 +33,8 @@ class HttpxForwarder(BaseForwarder):
             params=request.query_params,
             files = [("upload", (i.filename, i.file, i.content_type)) for i in fileinfos] if fileinfos else None,
         )
-        logger.debug(f"request headers: {str.join("\n\t", [f"{header}={value}" for header, value in request.headers.items()])}")
-        logger.debug(f"forwarded headers {fwd_request.headers}")
+        self._log_headers("request headers: {headers}", request.headers)
+        self._log_headers("forwarded headers {headers}",  fwd_request.headers)
 
         response = await self._CLIENT.send(fwd_request)
         logger.debug("request forwarded, returning response")
@@ -43,4 +43,13 @@ class HttpxForwarder(BaseForwarder):
             content=response.content,
             status_code=response.status_code,
             headers=response.headers,
+        )
+
+    def _log_headers(self, message, headers):
+        logger.debug(
+            message.format(
+                headers=str.join(
+                    "\n\t", [f"{header}={value}" for header, value in headers.items()]
+                )
+            )
         )
