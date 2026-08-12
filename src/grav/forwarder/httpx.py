@@ -23,7 +23,7 @@ class HttpxForwarder(BaseForwarder):
         )
         logger.debug(f"new url is {new_url.geturl()}")
 
-        with httpx.Client(timeout=None) as client:
+        async with httpx.AsyncClient(timeout=None) as client:
             fwd_request = client.build_request(
                 request.method,
                 new_url.geturl(),
@@ -34,7 +34,7 @@ class HttpxForwarder(BaseForwarder):
             self._log_headers("request headers: \n\t{headers}", request.headers)
             self._log_headers("forwarded headers: \n\t{headers}",  fwd_request.headers)
 
-            response = client.send(fwd_request)
+            response = await client.send(fwd_request)
             logger.debug("request forwarded, returning response")
 
         return Response(
