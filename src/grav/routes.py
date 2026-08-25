@@ -16,7 +16,7 @@ async def endpoint_scan(request, av_scanner: BaseAVScanner, forwarder: BaseForwa
             uploads = form.getlist("upload")
             if not uploads:
                 logger.info("failed to extract upload from request")
-                return JSONResponse({"error": "failed upload"}, status_code=400)
+                return JSONResponse({"error": "Échec de l'envoi du fichier"}, status_code=400)
             result = await av_scanner.process([upload.file for upload in uploads])
             if result == AVScanResult.SAFE:
                 logger.info("scanner determined that the file is safe, forwarding")
@@ -27,10 +27,10 @@ async def endpoint_scan(request, av_scanner: BaseAVScanner, forwarder: BaseForwa
                 return await forwarder.forward(request, fileinfos)
             elif result == AVScanResult.MALWARE:
                 logger.info("scanner determined that the file is malware, blocking")
-                return JSONResponse({"error": "malware file"}, status_code=400)
+                return JSONResponse({"error": "Fichier malveillant"}, status_code=400)
             else:
                 logger.info("failed to complete AV test")
-                return JSONResponse({"error": "failed AV test"}, status_code=502)
+                return JSONResponse({"error": "Échec de l'analyse antivirus"}, status_code=408)
     else:
         logger.info(f"received {request.method} request, forwarding as-is")
         return await forwarder.forward(request)
