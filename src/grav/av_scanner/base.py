@@ -1,5 +1,6 @@
 import enum
 from abc import ABC, abstractmethod
+from typing import BinaryIO
 
 
 class AVScanResult(enum.Enum):
@@ -10,5 +11,5 @@ class AVScanResult(enum.Enum):
 
 class BaseAVScanner(ABC):
     @abstractmethod
-    async def process(self, file) -> AVScanResult:
+    async def process(self, files: list[BinaryIO]) -> AVScanResult:
         pass

@@ -1,3 +1,4 @@
+import asyncio
 import enum
 import hashlib
 import logging
@@ -28,6 +29,7 @@ class SyndetectAVScanner(BaseAVScanner):
         self._CLIENT = httpx.AsyncClient(
             base_url=self._API_URL,
             headers={"X-Auth-token": self._API_TOKEN},
+            timeout=None,
         )
 
         self._MAX_POLL_TIME = max_poll_time
@@ -39,26 +41,38 @@ class SyndetectAVScanner(BaseAVScanner):
         SAFE = enum.auto()
         MALWARE = enum.auto()
 
-    async def process(self, file):
+    async def process(self, files):
+        logger.info(f"processing {len(files)} files")
+        tasks = list()
+        for file in files:
+            tasks.append(self._process_single(file))
+        results = await asyncio.gather(*tasks)
+        logger.info(f"got results for {len(files)} files")
+        for result in results:
+            if result == AVScanResult.MALWARE:
+                return AVScanResult.MALWARE
+            if result != AVScanResult.SAFE:
+                return AVScanResult.FAIL
+        return AVScanResult.SAFE
+
+    async def _process_single(self, file):
         digest = hashlib.file_digest(file, "sha256").hexdigest()
         logger.info(f"processing file with digest {digest}")
         scan_result = await self._check_sha256(digest)
+
         if scan_result == self._IntermediateResult.NOT_SCANNED:
             logger.debug(f"file {digest} is not scanned yet, submitting")
             await self._submit(file)
             logger.debug(f"file {digest} submitted")
-            retries = 0
-            while True:
-                await anyio.sleep(
-                    min(self._POLL_TIME_FACTOR**retries, self._MAX_POLL_TIME)
-                )
-                logger.debug(f"file {digest} checking results (retry {retries})")
-                scan_result = await self._check_sha256(digest)
-                if scan_result != self._IntermediateResult.SCANNING:
-                    break
-                retries += 1
-                if retries > self._RETRIES:
-                    break
+            # poll with faster retries at the start in case the file is scanned quickly
+            scan_result = await self._poll(digest)
+
+        elif scan_result == self._IntermediateResult.SCANNING:
+            logger.debug(f"file {digest} hasn't finished scanning yet, checking result")
+            # if the file is already being scanned, it's likely been for a long time.
+            # no need to poll fast at the start
+            scan_result = await self._poll(digest, max_duration=True)
+
         logger.info(f"file {digest} is {scan_result}")
         if scan_result == self._IntermediateResult.MALWARE:
             return AVScanResult.MALWARE
@@ -66,6 +80,26 @@ class SyndetectAVScanner(BaseAVScanner):
             return AVScanResult.SAFE
         else:
             return AVScanResult.FAIL
+
+    async def _poll(self, digest, max_duration=False):
+        retries = 0
+        while True:
+            if max_duration:
+                sleep_duration = self._MAX_POLL_TIME
+            else:
+                sleep_duration = min(
+                    self._POLL_TIME_FACTOR**retries,
+                    self._MAX_POLL_TIME,
+                )
+            await anyio.sleep(sleep_duration)
+            logger.debug(f"file {digest} checking results (retry {retries})")
+            scan_result = await self._check_sha256(digest)
+            if scan_result != self._IntermediateResult.SCANNING:
+                break
+            retries += 1
+            if retries > self._RETRIES:
+                break
+        return scan_result
 
     async def _submit(self, file):
         await self._CLIENT.post("/submit", files={"file": file})
@@ -77,12 +111,12 @@ class SyndetectAVScanner(BaseAVScanner):
             logger.debug(f"file sha {sha256} is not scanned yet")
             return self._IntermediateResult.NOT_SCANNED
         data = result.json()
-        if data.get("done") == True and data.get("is_malware") == False:
+        if data.get("done") and not data.get("is_malware"):
             logger.debug(f"file sha {sha256} is safe")
             return self._IntermediateResult.SAFE
-        elif data.get("done") == True and data.get("is_malware") == True:
+        elif data.get("done") and data.get("is_malware"):
             logger.debug(f"file sha {sha256} is malware")
             return self._IntermediateResult.MALWARE
-        elif not data.get("done") == True:
+        elif not data.get("done"):
             logger.debug(f"file sha {sha256} is still scanning")
             return self._IntermediateResult.SCANNING

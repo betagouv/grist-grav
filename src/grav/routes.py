@@ -4,28 +4,35 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from .av_scanner.base import AVScanResult, BaseAVScanner
-from .forwarder.base import BaseForwarder
+from .forwarder.base import BaseForwarder, FileInfo
 
 logger = logging.getLogger(__name__)
 
 
 async def endpoint_scan(request, av_scanner: BaseAVScanner, forwarder: BaseForwarder):
     if request.method == "POST":
-        # awaiting body() before form() ensures we can still read the body later on
-        # but maybe this has resource usage implications, we may need to manually save the body in a spooled temp file
-        await request.body()
+        logger.info("received POST request, processing")
         async with request.form() as form:
-            upload = form.get("upload")
-            if upload is None:
+            uploads = form.getlist("upload")
+            if not uploads:
+                logger.info("failed to extract upload from request")
                 return JSONResponse({"error": "Échec de l'envoi du fichier"}, status_code=400)
-            result = await av_scanner.process(upload.file)
+            result = await av_scanner.process([upload.file for upload in uploads])
             if result == AVScanResult.SAFE:
-                return await forwarder.forward(request)
+                logger.info("scanner determined that the file is safe, forwarding")
+                fileinfos = [
+                    FileInfo(upload.filename, upload.file, upload.content_type)
+                    for upload in uploads
+                ]
+                return await forwarder.forward(request, fileinfos)
             elif result == AVScanResult.MALWARE:
+                logger.info("scanner determined that the file is malware, blocking")
                 return JSONResponse({"error": "Fichier malveillant"}, status_code=400)
             else:
+                logger.info("failed to complete AV test")
                 return JSONResponse({"error": "Échec de l'analyse antivirus"}, status_code=408)
     else:
+        logger.info(f"received {request.method} request, forwarding as-is")
         return await forwarder.forward(request)
 
 
